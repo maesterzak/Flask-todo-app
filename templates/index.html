@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Todo App</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100">
+
+  <div class="container mx-auto py-8">
+    <h1 class="text-3xl font-semibold text-center mb-6">Flask Todo App</h1>
+
+    <!-- Todo Add Section Starts -->
+    <form action="/todos" method="post" class="mx-auto bg-white p-6 rounded-md shadow-md">
+      <input required type="text" name="description" id="todoInput" class="w-full px-4 py-2 border border-gray-300 rounded-md mb-4 focus:outline-none" placeholder="Add a new todo..">
+      <select name="category" class="p-2 focus:outline-none mt-5 mb-5 w-full border-red-400 rounded-md">
+          <option disabled>Select Category</option>
+          {% for category in categories %}
+              <option value="{{category.id}}">{{ category.name }}</option>
+          {% endfor %}
+      </select>
+      <button type="submit" class="w-full p-2 bg-blue-400 text-white font-semibold">Add Todo</button>
+  </form>
+    <!-- Todo Add Section Ends -->    
+
+    <div class="grid grid-cols-6 mt-5 gap-4">
+        <div class="col-span-2 bg-white rounded-md shadow-md p-3">
+            <h3 class="font-semibold text-lg text-center">Categories</h3>
+
+            <!-- Category Add Section Starts -->
+            <form action="/categories" method="post" class="max-w-md mx-auto bg-white p-6 rounded-md">
+                <input required type="text" name="categoryname" id="categoryname" class="w-full px-4 py-2 border border-gray-300 rounded-md mb-4 focus:outline-none" placeholder="Add a new category..">
+                <button class="w-full p-2 bg-blue-400 text-white font-semibold">Add</button>
+            </form>
+            <!-- Category Add Section Ends -->
+
+            <ul class="text-md mt-5 p-5 gap-3">
+              <li class="{{ 'p-2 mb-3' if current_category == 'All' else 'p-2 mb-3' }}">
+                  <a href="/" class="{{ 'text-white bg-blue-400 p-2 w-full' if current_category == 'All' else 'text-blue-400 p-2 w-full' }}">All</a>
+              </li>
+
+
+              {% for category in categories %}
+              <li class="{{ 'text-white p-2 flex mb-3 gap-4' if current_category == category.id else 'p-2 mb-3 flex gap-4' }}">
+                  <a href="/?category={{ category.id }}" id="category_{{ category.id }}" class="{{ 'text-white p-2 w-full bg-blue-400' if current_category == category.id else 'p-2 w-full text-blue-400' }}">
+                      {{ category.name }}
+                  </a>
+                  <span class="flex items-center">
+                      <i onclick="makeCategoryEditable({{ category.id }})" class="fas fa-edit edit-icon text-gray-500 mr-3 cursor-pointer" title="Edit"></i>
+                      <button onclick="deleteCategory({{ category.id }})">
+                          <i class="fas fa-trash delete-icon text-red-500 cursor-pointer" title="Delete" data-todo-id="{{ category.id }}"></i>
+                      </button>  
+                  </span>
+              </li>
+{% endfor %}
+  
+</ul>
+        </div>
+
+        <div class="col-span-4">
+            <ul class="todo-list">
+                <!-- Todo items will be added here -->
+                <!-- Todo List Section Starts -->
+                {% for todo in todos %}
+            <li class="flex justify-between items-center py-2 border-b border-gray-200">
+              <span id="todoDescription_{{ todo.id }}" class="text-lg">{{ todo.description }}</span>
+              <span class="flex items-center">
+                <i onclick="makeEditable({{ todo.id }})" class="fas fa-edit edit-icon text-gray-500 
+                  mr-3 cursor-pointer" title="Edit"></i>
+                <button onclick="deleteTodo({{todo.id}})">
+                <i class="fas fa-trash delete-icon text-red-500 cursor-pointer" title="Delete" data- 
+                 todo-id="{{todo.id}}"></i>
+                </button>  
+            </span>
+            </li>
+{% endfor %}
+                <!-- Todo List Section Ends -->
+            </ul>
+        </div>
+    </div>
+  </div>
+<script>
+  function makeEditable(todoId) {
+    // Get the element representing the todo description using its unique ID
+    const todoDescription = document.getElementById(`todoDescription_${todoId}`);
+    
+    // Capture the existing text content of the todo description
+    const descriptionText = todoDescription.textContent;
+    
+    // Create a new input field dynamically
+    const inputField = document.createElement('input');
+    inputField.type = 'text';
+    inputField.value = descriptionText;
+    
+    // Add CSS classes to the input field for styling
+    inputField.classList.add('border', 'border-gray-300', 'rounded-md', 'p-1');
+    
+    // Listen for 'Enter' key press event on the input field
+    inputField.addEventListener('keyup', function(event) {
+        // When 'Enter' key is pressed, trigger the updateTodoDescription function
+        if (event.key === 'Enter') {
+            updateTodoDescription(todoId, inputField.value);
+        }
+    });
+    
+    // Replace the original todo description element with the created input field
+    todoDescription.replaceWith(inputField);
+    
+    // Set focus on the input field to enable immediate editing of the todo description
+    inputField.focus();
+}
+  
+function updateTodoDescription(todoId, newDescription) {
+  // Perform an API request to update the todo description
+  fetch(`/todos/${todoId}`, {  // Make a PATCH request to the specified todo ID
+      method: 'PATCH',  // Using the PATCH method for partial update
+      headers: {
+          'Content-Type': 'application/json'  // Specify the request body as JSON
+      },
+      body: JSON.stringify({ description: newDescription })  // Set the new description in the request body
+  })
+  .then(response => {
+      if (response.ok) {  // Check if the response status is successful
+          console.log(`Todo with ID ${todoId} description updated`);  // Log a success message
+          window.location.reload(); // Refresh the page to reflect changes
+      } else {
+          console.error('Error updating todo description', response.statusText);  // Log an error if not successful
+      }
+  })
+  .catch(error => {
+      console.error('Error:', error);  // Catch and log any errors during the API request
+  });
+}
+    
+function deleteTodo(todoId) {
+  // Perform a DELETE request to the specified todo ID
+  fetch(`/todos/${todoId}`, {
+      method: "DELETE", // Using the DELETE method
+  })
+  .then(response => {
+      // Check if the response is successful (status code 200-299)
+      if (response.ok) {
+          console.log(`Todo with ID ${todoId} deleted`); // Log success message
+          window.location.replace("http://127.0.0.1:5000"); // Redirect to home page after deletion
+          // Optionally, you can remove the deleted todo from the UI here
+      } else {
+          console.error('Error deleting todo', response.statusText); // Log error if deletion fails
+      }
+  })
+  .catch(error => {
+      console.error('Error:', error); // Catch and log any errors during the API request
+  });
+}
+
+
+
+      function makeCategoryEditable(categoryId) {
+        // Get the category element using its ID
+        const category = document.getElementById(`category_${categoryId}`);
+        
+        // Get the current text content of the category element
+        const descriptionText = category.textContent;
+        
+        // Create a new input field element
+        const inputField = document.createElement('input');
+        inputField.type = 'text';
+        inputField.value = descriptionText;
+        
+        // Add CSS classes to the input field for styling
+        inputField.classList.add('border', 'border-gray-300', 'rounded-md', 'p-1');
+        
+        // Add an event listener for 'keyup' events on the input field
+        inputField.addEventListener('keyup', function(event) {
+          // If 'Enter' key is pressed
+          if (event.key === 'Enter') {
+            // Call the updateCategoryName function with the category ID and input value
+            updateCategoryName(categoryId, inputField.value);
+          }
+        });
+        
+        // Replace the category element with the input field in the DOM
+        category.replaceWith(inputField);
+        
+        // Focus on the newly created input field
+        inputField.focus();
+      }
+  
+      function updateCategoryName(categoryId, newName) {
+        // Perform a PATCH request to update the category name using the provided category ID
+        fetch(`/categories/${categoryId}`, {
+          method: 'PATCH', // Using the PATCH method for updating
+          headers: {
+            'Content-Type': 'application/json' // Setting content type as JSON
+          },
+          body: JSON.stringify({ name: newName }) // Sending the new name in JSON format
+        })
+        .then(response => {
+          // If the response is successful (status code 200-299)
+          if (response.ok) {
+            console.log(`Category with ID ${categoryId} name updated`); // Log success message
+            window.location.reload(); // Refresh the page to reflect changes
+          } else {
+            console.error('Error updating category name', response.statusText); // Log error message
+          }
+        })
+        .catch(error => {
+          console.error('Error:', error); // Log any catch error
+        });
+      }
+
+      function deleteCategory(categoryId) {
+    // Send a DELETE request to the specified category ID route
+    fetch(`/categories/${categoryId}`, {
+        method: "DELETE", // Using the DELETE HTTP method
+    })
+    .then(response => {
+        if (response.ok) {
+            // Log success message if the deletion is successful
+            console.log(`Category with ID ${categoryId} deleted`);
+            
+            // Redirect to the home page after successful deletion
+            window.location.replace("http://127.0.0.1:5000");
+            // Optionally, remove the deleted category from the UI here
+        } else {
+            // Log an error if deletion fails
+            console.error('Error deleting category', response.statusText);
+        }
+    })
+    .catch(error => {
+        // Log any errors that occur during the request
+        console.error('Error:', error);
+    });
+}
+</script>
+
+</body>
+</html>
